@@ -1,0 +1,169 @@
+%Block Treck
+%Fall 2012
+%Edward, Savannah, Sindhu
+
+%Parameters, these can be changed in order to change difficulty
+%Width: size of the level.
+#const width=15.
+%Min: minimum number of block pushes to win.
+#const min=9.
+%directionChanges: number of times block's push direction changes in its solution path.
+#const directionChanges = 3.
+
+%Constants
+#const blocks=1.
+%Ranges
+dim(1..width).
+moves(1..min).
+
+%Part 1
+%Basic level structure
+%Goal: define game elements and their relationships
+
+%Wall tile
+wall(X,Y) :-
+not block(X,Y),
+not goal(X,Y),
+not floor(X,Y),
+dim(X;Y).
+
+%Wall perimeter
+wall(X,width) :-
+dim(X).
+
+wall(X,1) :-
+dim(X).
+
+wall(1, Y) :-
+dim(Y).
+
+wall(width, Y) :-
+dim(Y).
+
+%Floor tile
+floor(X,Y) :-
+not wall(X,Y),
+dim(X;Y).
+
+%Defining blocks, players, goals and their overlaps
+1 {player(X,Y) :dim(X) :dim(Y)} 1.
+blocks {block(X,Y) :dim(X) :dim(Y)} blocks.
+blocks {goal(X,Y) :dim(X) :dim(Y)} blocks.
+
+blockOnGoal(X,Y) :- goal(X,Y), block(X,Y).
+:- blockOnGoal(X,Y).
+
+playerOnGoal(X,Y) :- goal(X,Y), player(X,Y).
+:- player(X,Y), block(X,Y).
+:- player(X,Y), wall(X,Y).
+
+%Part 2
+%Solvability Mechanics
+%Goal: Define the reachability of goals to blocks.
+
+step(0,-1 ;; 0,1 ;; 1,0 ;; -1,0).
+
+%next
+%with actionStep, defines time steps.
+%"0" is put in for Python parsing reasons only.
+next(A,B,0) :-
+moves(B),
+A = B - 1.
+
+%actionStep
+%With "next", defines time steps.
+actionStep(S) :-
+next(S, NS, 0).
+
+%blockStep
+%Initial configuration blockwise.
+blockStep(X,Y,0) :-
+block(X,Y).
+
+%playerStep
+%Initial configuration playerwise
+playerStep(X,Y,0) :-
+player(X,Y).
+
+%push:
+%Defines locations where the block may be pushed to at action step S
+%The player must be able to reach behind the block
+% and the block must be pushed to a valid space.
+push(X,Y,NX,NY,S) :-
+PX = X - DX,
+PY = Y - DY,
+reachableStep(PX,PY,S),
+blockStep(X,Y,S),
+step(DX,DY),
+NX = X + DX,
+NY = Y + DY,
+validPushSpace(NX,NY),
+actionStep(S).
+
+%validPushSpace:
+%Defines spaces where block may be pushed to at any given time/step.
+validPushSpace(X,Y) :-
+dim(X;Y),
+not wall(X,Y).
+
+%reachableStep(X,Y,S)
+%Defineslocations that are reachable by player at step s.
+reachableStep(X,Y,S) :-
+playerStep(X,Y,S).
+reachableStep(NX,NY,S) :-
+dim(X;Y),
+reachableStep(X,Y,S),
+step(DX,DY),
+NX = X + DX,
+NY = Y + DY,
+not blockStep(NX,NY,S),
+not wall(NX,NY).
+
+%playerStep:
+%The player is at a new location after a push
+playerStep(X,Y,NS) :-
+push(X,Y,NX,NY,S),
+next(S,NS,0).
+
+%blockStep:
+%The block is at a new location after a push.
+blockStep(NX,NY,NS) :-
+push(X,Y,NX,NY,S),
+next(S,NS,0).
+
+%Solvable
+%Assure that the block may reach the goal in a certain number of steps.
+solvable :- goal(X,Y), blockStep(X,Y,min).
+:- not solvable.
+
+%Part 3
+%Interest aspects
+%Goal: Set facts for finding interesting and difficult levels
+
+%shortPath:
+%to eliminate block back tracking
+%and keep the minimum length solution path spread throughout the level.
+shortPath :-
+moves(N),
+moves(S),
+N > S,
+blockStep(X,Y,N),
+blockStep(X,Y,S).
+:- shortPath.
+
+%dchange:
+%to calculate and control the number of times
+%a block's solution path changes direction.
+dchange(XB,YB) :-
+blockStep(XA,YA,N),
+blockStep(XB,YB,N+1),
+blockStep(XC,YC,N+2),
+step(DXA,DYA),
+step(DXB,DYB),
+DXA != DXB,
+DYA != DYB,
+XB = XA + DXA,
+YB = YA + DYA,
+XC = XB + DXB,
+YC = YB + DYB.
+directionChanges {dchange(XB,YB) :dim(XB;YB)} directionChanges.
